@@ -30,6 +30,7 @@ describe('HTTP API', () => {
     expect(response.text).toContain('/health');
     expect(response.text).toContain('Create a short link');
     expect(response.text).toContain('id="workflow-select"');
+    expect(response.text).toContain('>{"approvals":');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
     expect(response.headers['x-frame-options']).toBe('DENY');
   });

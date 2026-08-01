@@ -263,7 +263,11 @@ function renderHomePage(): string {
           </label>
           <label class="field">
             <span>Workflow payload (JSON)</span>
-            <textarea id="workflow-payload" name="workflowPayload">{\n  \"approvals\": {\n    \"requirements\": {\"approved\": true, \"approver\": \"product\" }\n  }\n}</textarea>
+            <textarea id="workflow-payload" name="workflowPayload">{
+  "approvals": {
+    "requirements": { "approved": true, "approver": "product" }
+  }
+}</textarea>
           </label>
           <div class="actions">
             <button type="button" id="run-workflow-button">Run workflow</button>

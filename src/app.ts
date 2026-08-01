@@ -324,7 +324,7 @@ function renderHomePage(): string {
           try {
             body = JSON.parse(payloadInput);
           } catch (error) {
-            workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
+            workflowResult.textContent = 'Workflow payload must be valid JSON.\\n' + error.message;
             return;
           }
         }
@@ -426,7 +426,7 @@ function renderHomePage(): string {
 
           if (issues.length > 0) {
             createErrors.hidden = false;
-            createErrors.textContent = issues.join('\n');
+            createErrors.textContent = issues.join('\\n');
             return;
           }
 

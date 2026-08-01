@@ -241,10 +241,13 @@ function renderHomePage(): string {
             <div class="actions">
               <button type="submit">Create link</button>
               <button type="button" class="secondary" id="fill-sample">Use sample values</button>
+              <button type="button" id="health-check-button">Check health</button>
+              <button type="button" class="secondary" id="refresh-links-button">Refresh links</button>
             </div>
           </form>
           <div id="create-errors" class="status error" hidden></div>
           <pre id="create-result" class="result">No request yet.</pre>
+          <pre id="links-list" class="result">Loading links…</pre>
         </article>
 
         <article class="panel">
@@ -297,7 +300,46 @@ function renderHomePage(): string {
       const createForm = document.getElementById('create-link-form');
       const createErrors = document.getElementById('create-errors');
       const createResult = document.getElementById('create-result');
+      const linksList = document.getElementById('links-list');
       const fillSampleButton = document.getElementById('fill-sample');
+      const healthButton = document.getElementById('health-check-button');
+      const refreshLinksButton = document.getElementById('refresh-links-button');
+      const workflowButton = document.getElementById('run-workflow-button');
+      const workflowResult = document.getElementById('workflow-result');
+
+      async function readResponseBody(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return response.json();
+        }
+        return response.text();
+      }
+
+      function setErrorBlock(element, message) {
+        element.hidden = false;
+        element.textContent = message;
+      }
+
+      async function refreshHealth() {
+        try {
+          const response = await fetch('/health');
+          const body = await readResponseBody(response);
+          createResult.textContent = JSON.stringify({ endpoint: '/health', status: response.status, body }, null, 2);
+        } catch (error) {
+          createResult.textContent = 'Health check failed: ' + error.message;
+        }
+      }
+
+      async function refreshLinks() {
+        try {
+          const response = await fetch('/api/urls');
+          const body = await readResponseBody(response);
+          const records = Array.isArray(body?.data) ? body.data : [];
+          linksList.textContent = JSON.stringify({ endpoint: '/api/urls', count: records.length, records }, null, 2);
+        } catch (error) {
+          linksList.textContent = 'Could not refresh links: ' + error.message;
+        }
+      }
 
       fillSampleButton.addEventListener('click', () => {
         document.getElementById('target-url').value = 'https://example.com/docs';
@@ -350,15 +392,29 @@ function renderHomePage(): string {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
-          const data = await response.json();
+          const data = await readResponseBody(response);
+          if (!response.ok) {
+            setErrorBlock(createErrors, JSON.stringify(data, null, 2));
+            createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
+            return;
+          }
+          createErrors.hidden = true;
+          createErrors.textContent = '';
           createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
+          await refreshHealth();
+          await refreshLinks();
         } catch (error) {
           createResult.textContent = 'Request failed: ' + error.message;
         }
       });
 
-      const workflowButton = document.getElementById('run-workflow-button');
-      const workflowResult = document.getElementById('workflow-result');
+      healthButton.addEventListener('click', () => {
+        refreshHealth();
+      });
+
+      refreshLinksButton.addEventListener('click', () => {
+        refreshLinks();
+      });
 
       workflowButton.addEventListener('click', async () => {
         const scenario = document.getElementById('workflow-select').value;
@@ -380,12 +436,15 @@ function renderHomePage(): string {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
           });
-          const data = await response.json();
+          const data = await readResponseBody(response);
           workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
         } catch (error) {
           workflowResult.textContent = 'Workflow request failed: ' + error.message;
         }
       });
+
+      refreshHealth();
+      refreshLinks();
     </script>
   </body>
 </html>`;

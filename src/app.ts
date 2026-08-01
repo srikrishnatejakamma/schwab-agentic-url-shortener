@@ -270,7 +270,13 @@ function renderHomePage(): string {
 }</textarea>
           </label>
           <div class="actions">
-            <button type="button" id="run-workflow-button">Run workflow</button>
+            <button
+              type="button"
+              id="run-workflow-button"
+              onclick="window.runWorkflowFromUi && window.runWorkflowFromUi()"
+            >
+              Run workflow
+            </button>
           </div>
           <pre id="workflow-result" class="result">Run a scenario to inspect its policy checks.</pre>
         </article>
@@ -301,6 +307,43 @@ function renderHomePage(): string {
     </main>
 
     <script>
+      function runWorkflowFromUi() {
+        const workflowButton = document.getElementById('run-workflow-button');
+        const workflowResult = document.getElementById('workflow-result');
+        if (!workflowButton || !workflowResult) {
+          return;
+        }
+
+        const scenario = document.getElementById('workflow-select').value;
+        const payloadInput = document.getElementById('workflow-payload').value.trim();
+
+        workflowResult.textContent = 'Sending workflow request…';
+
+        let body = {};
+        if (payloadInput) {
+          try {
+            body = JSON.parse(payloadInput);
+          } catch (error) {
+            workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
+            return;
+          }
+        }
+
+        fetch('/api/workflows/' + scenario, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+          .then(async (response) => {
+            const contentType = response.headers.get('content-type') || '';
+            const data = contentType.includes('application/json') ? await response.json() : await response.text();
+            workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
+          })
+          .catch((error) => {
+            workflowResult.textContent = 'Workflow request failed: ' + error.message;
+          });
+      }
+
       function initializeUi() {
         const createForm = document.getElementById('create-link-form');
         const createErrors = document.getElementById('create-errors');
@@ -425,38 +468,15 @@ function renderHomePage(): string {
           refreshLinks();
         });
 
-        workflowButton.addEventListener('click', async () => {
-          const scenario = document.getElementById('workflow-select').value;
-          const payloadInput = document.getElementById('workflow-payload').value.trim();
-
-          workflowResult.textContent = 'Sending workflow request…';
-
-          let body = {};
-          if (payloadInput) {
-            try {
-              body = JSON.parse(payloadInput);
-            } catch (error) {
-              workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
-              return;
-            }
-          }
-
-          try {
-            const response = await fetch('/api/workflows/' + scenario, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body)
-            });
-            const data = await readResponseBody(response);
-            workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
-          } catch (error) {
-            workflowResult.textContent = 'Workflow request failed: ' + error.message;
-          }
+        workflowButton.addEventListener('click', () => {
+          runWorkflowFromUi();
         });
 
         refreshHealth();
         refreshLinks();
       }
+
+      window.runWorkflowFromUi = runWorkflowFromUi;
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeUi);

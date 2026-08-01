@@ -301,154 +301,168 @@ function renderHomePage(): string {
     </main>
 
     <script>
-      const createForm = document.getElementById('create-link-form');
-      const createErrors = document.getElementById('create-errors');
-      const createResult = document.getElementById('create-result');
-      const linksList = document.getElementById('links-list');
-      const fillSampleButton = document.getElementById('fill-sample');
-      const healthButton = document.getElementById('health-check-button');
-      const refreshLinksButton = document.getElementById('refresh-links-button');
-      const workflowButton = document.getElementById('run-workflow-button');
-      const workflowResult = document.getElementById('workflow-result');
+      function initializeUi() {
+        const createForm = document.getElementById('create-link-form');
+        const createErrors = document.getElementById('create-errors');
+        const createResult = document.getElementById('create-result');
+        const linksList = document.getElementById('links-list');
+        const fillSampleButton = document.getElementById('fill-sample');
+        const healthButton = document.getElementById('health-check-button');
+        const refreshLinksButton = document.getElementById('refresh-links-button');
+        const workflowButton = document.getElementById('run-workflow-button');
+        const workflowResult = document.getElementById('workflow-result');
 
-      async function readResponseBody(response) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          return response.json();
-        }
-        return response.text();
-      }
-
-      function setErrorBlock(element, message) {
-        element.hidden = false;
-        element.textContent = message;
-      }
-
-      async function refreshHealth() {
-        try {
-          const response = await fetch('/health');
-          const body = await readResponseBody(response);
-          createResult.textContent = JSON.stringify({ endpoint: '/health', status: response.status, body }, null, 2);
-        } catch (error) {
-          createResult.textContent = 'Health check failed: ' + error.message;
-        }
-      }
-
-      async function refreshLinks() {
-        try {
-          const response = await fetch('/api/urls');
-          const body = await readResponseBody(response);
-          const records = Array.isArray(body?.data) ? body.data : [];
-          linksList.textContent = JSON.stringify({ endpoint: '/api/urls', count: records.length, records }, null, 2);
-        } catch (error) {
-          linksList.textContent = 'Could not refresh links: ' + error.message;
-        }
-      }
-
-      fillSampleButton.addEventListener('click', () => {
-        document.getElementById('target-url').value = 'https://example.com/docs';
-        document.getElementById('custom-code').value = 'team-docs';
-        document.getElementById('expires-days').value = '30';
-        document.getElementById('tags').value = 'internal, docs';
-        document.getElementById('idempotency-key').value = 'request-001';
-      });
-
-      createForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        createErrors.hidden = true;
-        createErrors.textContent = '';
-
-        const targetUrl = document.getElementById('target-url').value.trim();
-        const customCode = document.getElementById('custom-code').value.trim();
-        const expiresValue = document.getElementById('expires-days').value;
-        const tagsValue = document.getElementById('tags').value.trim();
-        const idempotencyKey = document.getElementById('idempotency-key').value.trim();
-
-        const issues = [];
-
-        if (!targetUrl) {
-          issues.push('Target URL is required.');
-        } else if (!/^https?:\/\//i.test(targetUrl)) {
-          issues.push('Only http(s) URLs are supported.');
-        }
-
-        if (customCode && !/^[a-zA-Z0-9_-]{4,24}$/.test(customCode)) {
-          issues.push('Custom code must be 4-24 letters, numbers, underscores, or dashes.');
-        }
-
-        if (issues.length > 0) {
-          createErrors.hidden = false;
-          createErrors.textContent = issues.join('\n');
+        if (!createForm || !createErrors || !createResult || !linksList || !fillSampleButton || !healthButton || !refreshLinksButton || !workflowButton || !workflowResult) {
           return;
         }
 
-        const payload = {
-          url: targetUrl,
-          customCode: customCode || undefined,
-          expiresInDays: expiresValue ? Number(expiresValue) : undefined,
-          tags: tagsValue ? tagsValue.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
-          idempotencyKey: idempotencyKey || undefined
-        };
-
-        try {
-          const response = await fetch('/api/urls', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const data = await readResponseBody(response);
-          if (!response.ok) {
-            setErrorBlock(createErrors, JSON.stringify(data, null, 2));
-            createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
-            return;
+        async function readResponseBody(response) {
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            return response.json();
           }
+          return response.text();
+        }
+
+        function setErrorBlock(element, message) {
+          element.hidden = false;
+          element.textContent = message;
+        }
+
+        async function refreshHealth() {
+          try {
+            const response = await fetch('/health');
+            const body = await readResponseBody(response);
+            createResult.textContent = JSON.stringify({ endpoint: '/health', status: response.status, body }, null, 2);
+          } catch (error) {
+            createResult.textContent = 'Health check failed: ' + error.message;
+          }
+        }
+
+        async function refreshLinks() {
+          try {
+            const response = await fetch('/api/urls');
+            const body = await readResponseBody(response);
+            const records = Array.isArray(body?.data) ? body.data : [];
+            linksList.textContent = JSON.stringify({ endpoint: '/api/urls', count: records.length, records }, null, 2);
+          } catch (error) {
+            linksList.textContent = 'Could not refresh links: ' + error.message;
+          }
+        }
+
+        fillSampleButton.addEventListener('click', () => {
+          document.getElementById('target-url').value = 'https://example.com/docs';
+          document.getElementById('custom-code').value = 'team-docs';
+          document.getElementById('expires-days').value = '30';
+          document.getElementById('tags').value = 'internal, docs';
+          document.getElementById('idempotency-key').value = 'request-001';
+        });
+
+        createForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
           createErrors.hidden = true;
           createErrors.textContent = '';
-          createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
-          await refreshHealth();
-          await refreshLinks();
-        } catch (error) {
-          createResult.textContent = 'Request failed: ' + error.message;
-        }
-      });
 
-      healthButton.addEventListener('click', () => {
-        refreshHealth();
-      });
+          const targetUrl = document.getElementById('target-url').value.trim();
+          const customCode = document.getElementById('custom-code').value.trim();
+          const expiresValue = document.getElementById('expires-days').value;
+          const tagsValue = document.getElementById('tags').value.trim();
+          const idempotencyKey = document.getElementById('idempotency-key').value.trim();
 
-      refreshLinksButton.addEventListener('click', () => {
-        refreshLinks();
-      });
+          const issues = [];
 
-      workflowButton.addEventListener('click', async () => {
-        const scenario = document.getElementById('workflow-select').value;
-        const payloadInput = document.getElementById('workflow-payload').value.trim();
+          if (!targetUrl) {
+            issues.push('Target URL is required.');
+          } else if (!/^https?:\/\//i.test(targetUrl)) {
+            issues.push('Only http(s) URLs are supported.');
+          }
 
-        let body = {};
-        if (payloadInput) {
-          try {
-            body = JSON.parse(payloadInput);
-          } catch (error) {
-            workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
+          if (customCode && !/^[a-zA-Z0-9_-]{4,24}$/.test(customCode)) {
+            issues.push('Custom code must be 4-24 letters, numbers, underscores, or dashes.');
+          }
+
+          if (issues.length > 0) {
+            createErrors.hidden = false;
+            createErrors.textContent = issues.join('\n');
             return;
           }
-        }
 
-        try {
-          const response = await fetch('/api/workflows/' + scenario, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-          const data = await readResponseBody(response);
-          workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
-        } catch (error) {
-          workflowResult.textContent = 'Workflow request failed: ' + error.message;
-        }
-      });
+          const payload = {
+            url: targetUrl,
+            customCode: customCode || undefined,
+            expiresInDays: expiresValue ? Number(expiresValue) : undefined,
+            tags: tagsValue ? tagsValue.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
+            idempotencyKey: idempotencyKey || undefined
+          };
 
-      refreshHealth();
-      refreshLinks();
+          try {
+            const response = await fetch('/api/urls', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await readResponseBody(response);
+            if (!response.ok) {
+              setErrorBlock(createErrors, JSON.stringify(data, null, 2));
+              createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
+              return;
+            }
+            createErrors.hidden = true;
+            createErrors.textContent = '';
+            createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
+            await refreshHealth();
+            await refreshLinks();
+          } catch (error) {
+            createResult.textContent = 'Request failed: ' + error.message;
+          }
+        });
+
+        healthButton.addEventListener('click', () => {
+          refreshHealth();
+        });
+
+        refreshLinksButton.addEventListener('click', () => {
+          refreshLinks();
+        });
+
+        workflowButton.addEventListener('click', async () => {
+          const scenario = document.getElementById('workflow-select').value;
+          const payloadInput = document.getElementById('workflow-payload').value.trim();
+
+          workflowResult.textContent = 'Sending workflow request…';
+
+          let body = {};
+          if (payloadInput) {
+            try {
+              body = JSON.parse(payloadInput);
+            } catch (error) {
+              workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
+              return;
+            }
+          }
+
+          try {
+            const response = await fetch('/api/workflows/' + scenario, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            const data = await readResponseBody(response);
+            workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
+          } catch (error) {
+            workflowResult.textContent = 'Workflow request failed: ' + error.message;
+          }
+        });
+
+        refreshHealth();
+        refreshLinks();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeUi);
+      } else {
+        initializeUi();
+      }
     </script>
   </body>
 </html>`;

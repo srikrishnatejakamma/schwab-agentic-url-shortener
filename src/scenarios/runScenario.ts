@@ -6,8 +6,12 @@ import { WorkflowEngine } from '../orchestration/workflowEngine.js';
 import { policyRegistry } from '../orchestration/policies.js';
 import { createScenarioCatalog } from './catalog.js';
 
+function getScenarioNameFromArgs(argv: string[]): string | undefined {
+  return argv[2];
+}
+
 async function main(): Promise<void> {
-  const scenarioName = process.argv[2];
+  const scenarioName = getScenarioNameFromArgs(process.argv);
   const catalog = createScenarioCatalog();
 
   if (!scenarioName || !catalog[scenarioName]) {

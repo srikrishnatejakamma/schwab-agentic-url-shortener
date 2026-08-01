@@ -7,6 +7,10 @@ type RepositoryFileShape = {
   records: UrlRecord[];
 };
 
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 export class FileUrlRepository implements UrlRepository {
   private readonly records = new Map<string, UrlRecord>();
   private loaded = false;
@@ -54,10 +58,11 @@ export class FileUrlRepository implements UrlRepository {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as RepositoryFileShape;
-      parsed.records.forEach((record) => this.records.set(record.code, record));
+      for (const record of parsed.records) {
+        this.records.set(record.code, record);
+      }
     } catch (error) {
-      const isMissingFile = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-      if (!isMissingFile) {
+      if (!isMissingFileError(error)) {
         throw error;
       }
     }

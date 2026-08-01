@@ -5,6 +5,8 @@ import { config } from './config.js';
 import { UrlShortenerService } from './domain/urlShortenerService.js';
 import { FileUrlRepository } from './storage/fileUrlRepository.js';
 
+const PORT_RETRY_WINDOW = 20;
+
 function deriveBaseUrl(port: number): string {
   const url = new URL(config.baseUrl);
   url.port = String(port);
@@ -17,7 +19,7 @@ function listenOnAvailablePort(server: ReturnType<typeof createServer>, initialP
       const onError = (error: NodeJS.ErrnoException) => {
         server.off('error', onError);
 
-        if (error.code === 'EADDRINUSE' && port < initialPort + 20) {
+        if (error.code === 'EADDRINUSE' && port < initialPort + PORT_RETRY_WINDOW) {
           attemptListen(port + 1);
           return;
         }

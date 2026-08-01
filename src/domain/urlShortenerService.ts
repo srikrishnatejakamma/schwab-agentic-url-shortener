@@ -17,11 +17,15 @@ type ResolveMetadata = {
 };
 
 export class UrlShortenerService {
+  private readonly normalizedBaseUrl: string;
+
   public constructor(
     private readonly repository: UrlRepository,
     private readonly baseUrl: string,
     private readonly now: () => Date = () => new Date()
-  ) {}
+  ) {
+    this.normalizedBaseUrl = this.baseUrl.replace(/\/+$/, '');
+  }
 
   public async createShortUrl(input: CreateUrlRequest): Promise<CreateUrlResult> {
     if (input.idempotencyKey) {
@@ -38,14 +42,15 @@ export class UrlShortenerService {
     }
 
     const createdAt = this.now().toISOString();
+    const createdAtMs = Date.parse(createdAt);
     const expiresAt = input.expiresInDays
-      ? new Date(this.now().getTime() + input.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+      ? new Date(createdAtMs + input.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
       : undefined;
 
     const record: UrlRecord = {
       code,
       targetUrl: input.url,
-      shortUrl: `${this.baseUrl.replace(/\/+$/, '')}/r/${code}`,
+      shortUrl: `${this.normalizedBaseUrl}/r/${code}`,
       createdAt,
       updatedAt: createdAt,
       expiresAt,
@@ -63,17 +68,17 @@ export class UrlShortenerService {
   }
 
   public async resolveShortUrl(code: string, metadata: ResolveMetadata): Promise<UrlRecord> {
-    const record = await this.repository.getByCode(code);
-    if (!record) {
-      throw new ServiceError(`Short code '${code}' was not found.`, 404);
-    }
+    const record = await this.getRequiredRecord(code);
 
-    if (record.expiresAt && new Date(record.expiresAt).getTime() <= this.now().getTime()) {
+    const resolvedAt = this.now().toISOString();
+    const resolvedAtMs = Date.parse(resolvedAt);
+
+    if (record.expiresAt && Date.parse(record.expiresAt) <= resolvedAtMs) {
       throw new ServiceError(`Short code '${code}' has expired.`, 410);
     }
 
     const accessEvent: UrlAccessEvent = {
-      timestamp: this.now().toISOString(),
+      timestamp: resolvedAt,
       requester: metadata.requester,
       userAgent: metadata.userAgent,
       referrer: metadata.referrer
@@ -96,10 +101,7 @@ export class UrlShortenerService {
   }
 
   public async getAnalytics(code: string): Promise<AnalyticsSnapshot> {
-    const record = await this.repository.getByCode(code);
-    if (!record) {
-      throw new ServiceError(`Short code '${code}' was not found.`, 404);
-    }
+    const record = await this.getRequiredRecord(code);
 
     return {
       code: record.code,
@@ -152,5 +154,14 @@ export class UrlShortenerService {
     }
 
     throw new ServiceError('Unable to allocate a unique short code after repeated attempts.', 503);
+  }
+
+  private async getRequiredRecord(code: string): Promise<UrlRecord> {
+    const record = await this.repository.getByCode(code);
+    if (!record) {
+      throw new ServiceError(`Short code '${code}' was not found.`, 404);
+    }
+
+    return record;
   }
 }

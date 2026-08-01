@@ -7,13 +7,17 @@ import { WorkflowEngine } from './orchestration/workflowEngine.js';
 import { policyRegistry } from './orchestration/policies.js';
 import { createScenarioCatalog } from './scenarios/catalog.js';
 
-function getRequester(request: Request): string {
+function getClientAddress(request: Request): string {
   const forwarded = request.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.length > 0) {
     return forwarded.split(',')[0].trim();
   }
 
   return request.ip || 'anonymous';
+}
+
+function getRequester(request: Request): string {
+  return getClientAddress(request);
 }
 
 function renderHomePage(): string {
@@ -306,43 +310,6 @@ function renderHomePage(): string {
     </main>
 
     <script>
-      function runWorkflowFromUi() {
-        const workflowButton = document.getElementById('run-workflow-button');
-        const workflowResult = document.getElementById('workflow-result');
-        if (!workflowButton || !workflowResult) {
-          return;
-        }
-
-        const scenario = document.getElementById('workflow-select').value;
-        const payloadInput = document.getElementById('workflow-payload').value.trim();
-
-        workflowResult.textContent = 'Sending workflow request…';
-
-        let body = {};
-        if (payloadInput) {
-          try {
-            body = JSON.parse(payloadInput);
-          } catch (error) {
-            workflowResult.textContent = 'Workflow payload must be valid JSON.\\n' + error.message;
-            return;
-          }
-        }
-
-        fetch('/api/workflows/' + scenario, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        })
-          .then(async (response) => {
-            const contentType = response.headers.get('content-type') || '';
-            const data = contentType.includes('application/json') ? await response.json() : await response.text();
-            workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
-          })
-          .catch((error) => {
-            workflowResult.textContent = 'Workflow request failed: ' + error.message;
-          });
-      }
-
       function initializeUi() {
         const createForm = document.getElementById('create-link-form');
         const createErrors = document.getElementById('create-errors');
@@ -389,6 +356,35 @@ function renderHomePage(): string {
             linksList.textContent = JSON.stringify({ endpoint: '/api/urls', count: records.length, records }, null, 2);
           } catch (error) {
             linksList.textContent = 'Could not refresh links: ' + error.message;
+          }
+        }
+
+        async function runWorkflow() {
+          const scenario = document.getElementById('workflow-select').value;
+          const payloadInput = document.getElementById('workflow-payload').value.trim();
+
+          workflowResult.textContent = 'Sending workflow request…';
+
+          let body = {};
+          if (payloadInput) {
+            try {
+              body = JSON.parse(payloadInput);
+            } catch (error) {
+              workflowResult.textContent = 'Workflow payload must be valid JSON.\\n' + error.message;
+              return;
+            }
+          }
+
+          try {
+            const response = await fetch('/api/workflows/' + scenario, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
+            });
+            const data = await readResponseBody(response);
+            workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
+          } catch (error) {
+            workflowResult.textContent = 'Workflow request failed: ' + error.message;
           }
         }
 
@@ -468,14 +464,12 @@ function renderHomePage(): string {
         });
 
         workflowButton.addEventListener('click', () => {
-          runWorkflowFromUi();
+          runWorkflow();
         });
 
         refreshHealth();
         refreshLinks();
       }
-
-      window.runWorkflowFromUi = runWorkflowFromUi;
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeUi);
@@ -497,12 +491,7 @@ const rateLimitMaxRequests = 30;
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
 
 function getClientKey(request: Request): string {
-  const forwarded = request.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-
-  return request.ip || 'anonymous';
+  return getClientAddress(request);
 }
 
 function applySecurityHeaders(response: Response): void {

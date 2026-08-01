@@ -48,6 +48,16 @@ async function start(): Promise<void> {
   const server = createServer(app);
 
   const actualPort = await listenOnAvailablePort(server, config.port);
+
+  const shutdown = async (signal: NodeJS.Signals) => {
+    console.log(`${signal} received, shutting down server...`);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    process.exit(0);
+  };
+
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
+
   console.log(`URL shortener listening on ${deriveBaseUrl(actualPort)}`);
 }
 

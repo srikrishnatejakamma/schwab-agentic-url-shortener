@@ -28,6 +28,28 @@ describe('HTTP API', () => {
     expect(response.headers['content-type']).toContain('text/html');
     expect(response.text).toContain('Agentic URL Shortener');
     expect(response.text).toContain('/health');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-frame-options']).toBe('DENY');
+  });
+
+  it('rate limits create-url requests per client', async () => {
+    const app = await createTestApp();
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      await request(app)
+        .post('/api/urls')
+        .set('x-forwarded-for', '203.0.113.10')
+        .send({ url: `https://example.com/${attempt}`, tags: [] })
+        .expect(201);
+    }
+
+    const limited = await request(app)
+      .post('/api/urls')
+      .set('x-forwarded-for', '203.0.113.10')
+      .send({ url: 'https://example.com/blocked', tags: [] })
+      .expect(429);
+
+    expect(limited.body.message).toContain('Too many requests');
   });
 
   it('creates a short url and exposes analytics after a redirect', async () => {

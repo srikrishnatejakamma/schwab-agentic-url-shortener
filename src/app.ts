@@ -152,12 +152,70 @@ function renderHomePage(): string {
 </html>`;
 }
 
+type RateLimitBucket = {
+  windowStartedAt: number;
+  requestCount: number;
+};
+
+const rateLimitWindowMs = 60_000;
+const rateLimitMaxRequests = 30;
+const rateLimitBuckets = new Map<string, RateLimitBucket>();
+
+function getClientKey(request: Request): string {
+  const forwarded = request.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  return request.ip || 'anonymous';
+}
+
+function applySecurityHeaders(response: Response): void {
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  response.setHeader('X-Frame-Options', 'DENY');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  response.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+}
+
+function enforceRateLimit(request: Request, response: Response, bucketName: string): boolean {
+  const now = Date.now();
+  const clientKey = `${bucketName}:${getClientKey(request)}`;
+  const bucket = rateLimitBuckets.get(clientKey);
+
+  if (!bucket || now - bucket.windowStartedAt >= rateLimitWindowMs) {
+    rateLimitBuckets.set(clientKey, { windowStartedAt: now, requestCount: 1 });
+    return true;
+  }
+
+  if (bucket.requestCount >= rateLimitMaxRequests) {
+    response.status(429).json({
+      message: 'Too many requests. Please retry later.'
+    });
+    return false;
+  }
+
+  bucket.requestCount += 1;
+  return true;
+}
+
 export function createApp(urlShortenerService: UrlShortenerService) {
   const app = express();
   const workflowEngine = new WorkflowEngine(policyRegistry);
   const scenarioCatalog = createScenarioCatalog();
 
   app.use(express.json());
+  app.use((request, response, next) => {
+    applySecurityHeaders(response);
+
+    const startedAt = Date.now();
+
+    response.on('finish', () => {
+      const durationMs = Date.now() - startedAt;
+      console.log(`${request.method} ${request.originalUrl} ${response.statusCode} ${durationMs}ms`);
+    });
+
+    next();
+  });
 
   app.get('/', (_request, response) => {
     response.type('html').send(renderHomePage());
@@ -177,6 +235,10 @@ export function createApp(urlShortenerService: UrlShortenerService) {
   });
 
   app.post('/api/urls', async (request, response) => {
+    if (!enforceRateLimit(request, response, 'create-url')) {
+      return;
+    }
+
     const input = createUrlRequestSchema.parse(request.body);
     const result = await urlShortenerService.createShortUrl(input);
     response.status(result.created ? 201 : 200).json(result);
@@ -224,6 +286,10 @@ export function createApp(urlShortenerService: UrlShortenerService) {
   });
 
   app.post('/api/workflows/:scenario', async (request, response) => {
+    if (!enforceRateLimit(request, response, 'workflow-run')) {
+      return;
+    }
+
     const scenario = scenarioCatalog[request.params.scenario];
     if (!scenario) {
       response.status(404).json({ message: 'Scenario not found.' });

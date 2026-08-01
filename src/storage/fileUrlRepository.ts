@@ -10,8 +10,11 @@ type RepositoryFileShape = {
 export class FileUrlRepository implements UrlRepository {
   private readonly records = new Map<string, UrlRecord>();
   private loaded = false;
+  private readonly tempFilePath: string;
 
-  public constructor(private readonly filePath: string) {}
+  public constructor(private readonly filePath: string) {
+    this.tempFilePath = `${filePath}.${process.pid}.tmp`;
+  }
 
   public async getByCode(code: string): Promise<UrlRecord | undefined> {
     await this.load();
@@ -67,6 +70,8 @@ export class FileUrlRepository implements UrlRepository {
       records: Array.from(this.records.values())
     };
 
-    await fs.writeFile(this.filePath, JSON.stringify(payload, null, 2), 'utf8');
+    await fs.writeFile(this.tempFilePath, JSON.stringify(payload, null, 2), 'utf8');
+    await fs.rm(this.filePath, { force: true });
+    await fs.rename(this.tempFilePath, this.filePath);
   }
 }

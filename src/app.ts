@@ -32,6 +32,7 @@ function renderHomePage(): string {
         --muted: #5f6b76;
         --accent: #0f766e;
         --border: #d7c7ad;
+        --error: #a61b1b;
       }
 
       * { box-sizing: border-box; }
@@ -44,7 +45,7 @@ function renderHomePage(): string {
       }
 
       main {
-        max-width: 960px;
+        max-width: 1100px;
         margin: 0 auto;
         padding: 48px 20px 72px;
       }
@@ -83,7 +84,7 @@ function renderHomePage(): string {
 
       .grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
         gap: 20px;
       }
 
@@ -94,6 +95,88 @@ function renderHomePage(): string {
       h2 {
         margin-top: 0;
         font-size: 1.2rem;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field span {
+        font-weight: 600;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font: inherit;
+        background: white;
+      }
+
+      .field textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 4px;
+      }
+
+      button {
+        border: none;
+        border-radius: 999px;
+        background: var(--accent);
+        color: white;
+        padding: 10px 14px;
+        cursor: pointer;
+        font: inherit;
+      }
+
+      button.secondary {
+        background: #7c5b2d;
+      }
+
+      .helper {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .status {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #f4ead9;
+        color: var(--ink);
+        white-space: pre-wrap;
+      }
+
+      .status.error {
+        color: var(--error);
+        background: #fdeceb;
+      }
+
+      .result {
+        margin-top: 10px;
+        background: #0f172a;
+        color: #f8fafc;
+        padding: 12px;
+        border-radius: 10px;
+        overflow: auto;
+        font-size: 0.92rem;
       }
 
       ul {
@@ -127,6 +210,67 @@ function renderHomePage(): string {
 
       <section class="grid">
         <article class="panel">
+          <h2>Create a short link</h2>
+          <p class="helper">The form below adds stronger client-side checks and more creation options for the assignment flow.</p>
+          <form id="create-link-form" novalidate>
+            <label class="field">
+              <span>Target URL</span>
+              <input id="target-url" name="url" type="url" placeholder="https://example.com/docs" required />
+            </label>
+            <label class="field">
+              <span>Custom short code</span>
+              <input id="custom-code" name="customCode" placeholder="team-docs" maxlength="24" />
+            </label>
+            <label class="field">
+              <span>Expiration</span>
+              <select id="expires-days" name="expiresInDays">
+                <option value="">No expiration</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tags</span>
+              <input id="tags" name="tags" placeholder="internal, docs" />
+            </label>
+            <label class="field">
+              <span>Idempotency key</span>
+              <input id="idempotency-key" name="idempotencyKey" placeholder="request-001" />
+            </label>
+            <div class="actions">
+              <button type="submit">Create link</button>
+              <button type="button" class="secondary" id="fill-sample">Use sample values</button>
+            </div>
+          </form>
+          <div id="create-errors" class="status error" hidden></div>
+          <pre id="create-result" class="result">No request yet.</pre>
+        </article>
+
+        <article class="panel">
+          <h2>Workflow checks</h2>
+          <p class="helper">Choose a scenario and submit approval or input payloads to inspect policy gates and orchestration checks.</p>
+          <label class="field">
+            <span>Scenario</span>
+            <select id="workflow-select" name="workflow-select">
+              <option value="greenfield">Greenfield</option>
+              <option value="brownfield">Brownfield</option>
+              <option value="ambiguous">Ambiguous</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Workflow payload (JSON)</span>
+            <textarea id="workflow-payload" name="workflowPayload">{\n  \"approvals\": {\n    \"requirements\": {\"approved\": true, \"approver\": \"product\" }\n  }\n}</textarea>
+          </label>
+          <div class="actions">
+            <button type="button" id="run-workflow-button">Run workflow</button>
+          </div>
+          <pre id="workflow-result" class="result">Run a scenario to inspect its policy checks.</pre>
+        </article>
+      </section>
+
+      <section class="grid" style="margin-top: 20px;">
+        <article class="panel">
           <h2>Core API</h2>
           <ul>
             <li><a href="/health">GET /health</a> for service health and repository stats</li>
@@ -148,6 +292,101 @@ function renderHomePage(): string {
         </article>
       </section>
     </main>
+
+    <script>
+      const createForm = document.getElementById('create-link-form');
+      const createErrors = document.getElementById('create-errors');
+      const createResult = document.getElementById('create-result');
+      const fillSampleButton = document.getElementById('fill-sample');
+
+      fillSampleButton.addEventListener('click', () => {
+        document.getElementById('target-url').value = 'https://example.com/docs';
+        document.getElementById('custom-code').value = 'team-docs';
+        document.getElementById('expires-days').value = '30';
+        document.getElementById('tags').value = 'internal, docs';
+        document.getElementById('idempotency-key').value = 'request-001';
+      });
+
+      createForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        createErrors.hidden = true;
+        createErrors.textContent = '';
+
+        const targetUrl = document.getElementById('target-url').value.trim();
+        const customCode = document.getElementById('custom-code').value.trim();
+        const expiresValue = document.getElementById('expires-days').value;
+        const tagsValue = document.getElementById('tags').value.trim();
+        const idempotencyKey = document.getElementById('idempotency-key').value.trim();
+
+        const issues = [];
+
+        if (!targetUrl) {
+          issues.push('Target URL is required.');
+        } else if (!/^https?:\/\//i.test(targetUrl)) {
+          issues.push('Only http(s) URLs are supported.');
+        }
+
+        if (customCode && !/^[a-zA-Z0-9_-]{4,24}$/.test(customCode)) {
+          issues.push('Custom code must be 4-24 letters, numbers, underscores, or dashes.');
+        }
+
+        if (issues.length > 0) {
+          createErrors.hidden = false;
+          createErrors.textContent = issues.join('\n');
+          return;
+        }
+
+        const payload = {
+          url: targetUrl,
+          customCode: customCode || undefined,
+          expiresInDays: expiresValue ? Number(expiresValue) : undefined,
+          tags: tagsValue ? tagsValue.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
+          idempotencyKey: idempotencyKey || undefined
+        };
+
+        try {
+          const response = await fetch('/api/urls', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await response.json();
+          createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
+        } catch (error) {
+          createResult.textContent = 'Request failed: ' + error.message;
+        }
+      });
+
+      const workflowButton = document.getElementById('run-workflow-button');
+      const workflowResult = document.getElementById('workflow-result');
+
+      workflowButton.addEventListener('click', async () => {
+        const scenario = document.getElementById('workflow-select').value;
+        const payloadInput = document.getElementById('workflow-payload').value.trim();
+
+        let body = {};
+        if (payloadInput) {
+          try {
+            body = JSON.parse(payloadInput);
+          } catch (error) {
+            workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
+            return;
+          }
+        }
+
+        try {
+          const response = await fetch('/api/workflows/' + scenario, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const data = await response.json();
+          workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
+        } catch (error) {
+          workflowResult.textContent = 'Workflow request failed: ' + error.message;
+        }
+      });
+    </script>
   </body>
 </html>`;
 }

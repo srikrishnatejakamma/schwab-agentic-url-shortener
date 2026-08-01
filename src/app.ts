@@ -273,7 +273,6 @@ function renderHomePage(): string {
             <button
               type="button"
               id="run-workflow-button"
-              onclick="window.runWorkflowFromUi && window.runWorkflowFromUi()"
             >
               Run workflow
             </button>

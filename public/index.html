@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agentic URL Shortener Prototype</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Schwab Assignment Prototype</p>
+        <h1>Agentic URL Shortener</h1>
+        <p>A runnable URL shortener service paired with a governed workflow engine for greenfield, brownfield, and ambiguous SDLC execution scenarios.</p>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Create a short link</h2>
+          <p class="helper">The form below adds stronger client-side checks and more creation options for the assignment flow.</p>
+          <form id="create-link-form" novalidate>
+            <label class="field">
+              <span>Target URL</span>
+              <input id="target-url" name="url" type="url" placeholder="https://example.com/docs" required />
+            </label>
+            <label class="field">
+              <span>Custom short code</span>
+              <input id="custom-code" name="customCode" placeholder="team-docs" maxlength="24" />
+            </label>
+            <label class="field">
+              <span>Expiration</span>
+              <select id="expires-days" name="expiresInDays">
+                <option value="">No expiration</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tags</span>
+              <input id="tags" name="tags" placeholder="internal, docs" />
+            </label>
+            <label class="field">
+              <span>Idempotency key</span>
+              <input id="idempotency-key" name="idempotencyKey" placeholder="request-001" />
+            </label>
+            <div class="actions">
+              <button type="submit">Create link</button>
+              <button type="button" class="secondary" id="fill-sample">Use sample values</button>
+              <button type="button" id="health-check-button">Check health</button>
+              <button type="button" class="secondary" id="refresh-links-button">Refresh links</button>
+            </div>
+          </form>
+          <div id="create-errors" class="status error" hidden></div>
+          <pre id="create-result" class="result">No request yet.</pre>
+          <pre id="health-result" class="result">Loading health...</pre>
+          <div class="table-wrap">
+            <table aria-label="Created URLs">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Short URL</th>
+                  <th>Target URL</th>
+                  <th>Clicks</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="links-table-body">
+                <tr>
+                  <td colspan="5" class="muted">Loading links...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>Workflow checks</h2>
+          <p class="helper">Choose a scenario and submit approval or input payloads to inspect policy gates and orchestration checks.</p>
+          <label class="field">
+            <span>Scenario</span>
+            <select id="workflow-select" name="workflow-select">
+              <option value="greenfield">Greenfield</option>
+              <option value="brownfield">Brownfield</option>
+              <option value="ambiguous">Ambiguous</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Workflow payload (JSON)</span>
+            <textarea id="workflow-payload" name="workflowPayload">{
+  "approvals": {
+    "requirements": { "approved": true, "approver": "product" }
+  }
+}</textarea>
+          </label>
+          <div class="actions">
+            <button type="button" id="run-workflow-button">Run workflow</button>
+          </div>
+          <pre id="workflow-result" class="result">Run a scenario to inspect its policy checks.</pre>
+        </article>
+      </section>
+
+      <section class="grid section-top">
+        <article class="panel">
+          <h2>Core API</h2>
+          <ul>
+            <li><a href="/health">GET /health</a> for service health and repository stats</li>
+            <li><a href="/api/urls">GET /api/urls</a> to list shortened URLs</li>
+            <li><code>POST /api/urls</code> to create a new short link</li>
+            <li><code>GET /api/urls/:code/analytics</code> for usage analytics</li>
+            <li><code>GET /r/:code</code> to redirect to the target URL</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>Workflow Scenarios</h2>
+          <ul>
+            <li><a href="/api/workflows">GET /api/workflows</a> to inspect available orchestration scenarios</li>
+            <li><code>POST /api/workflows/greenfield</code> for governed new-system delivery</li>
+            <li><code>POST /api/workflows/brownfield</code> for enhancement and impact analysis</li>
+            <li><code>POST /api/workflows/ambiguous</code> for clarification-driven re-planning</li>
+          </ul>
+        </article>
+      </section>
+
+      <div id="created-url-modal" class="modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="created-url-title">
+          <h3 id="created-url-title">URL created successfully</h3>
+          <div id="created-url-details" class="kv"></div>
+          <div class="actions top-gap">
+            <button type="button" id="modal-open-short">Open short URL</button>
+            <button type="button" class="secondary" id="modal-open-target">Open target URL</button>
+            <button type="button" class="secondary" id="modal-close">Close</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="/assets/app-ui.js" defer></script>
+  </body>
+</html>

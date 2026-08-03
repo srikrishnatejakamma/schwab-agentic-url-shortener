@@ -10,6 +10,7 @@ RUN if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
 FROM deps AS build
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
+COPY public ./public
 RUN if [ -f yarn.lock ]; then yarn build; else npm run build; fi
 
 FROM node:24-bookworm-slim AS runtime
@@ -18,6 +19,7 @@ ENV NODE_ENV=production
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/public ./public
 COPY package.json ./package.json
 
 EXPOSE 3000

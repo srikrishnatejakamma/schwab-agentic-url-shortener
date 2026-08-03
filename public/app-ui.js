@@ -1,247 +1,294 @@
-function initializeUi() {
-  const createForm = document.getElementById('create-link-form');
-  const createErrors = document.getElementById('create-errors');
-  const createResult = document.getElementById('create-result');
-  const healthResult = document.getElementById('health-result');
-  const linksTableBody = document.getElementById('links-table-body');
-  const fillSampleButton = document.getElementById('fill-sample');
-  const healthButton = document.getElementById('health-check-button');
-  const refreshLinksButton = document.getElementById('refresh-links-button');
-  const workflowButton = document.getElementById('run-workflow-button');
-  const workflowResult = document.getElementById('workflow-result');
-  const createdUrlModal = document.getElementById('created-url-modal');
-  const createdUrlDetails = document.getElementById('created-url-details');
-  const modalOpenShort = document.getElementById('modal-open-short');
-  const modalOpenTarget = document.getElementById('modal-open-target');
-  const modalClose = document.getElementById('modal-close');
-  const modalState = {
-    shortUrl: '',
-    targetUrl: ''
-  };
+const jsonHeaders = { 'Content-Type': 'application/json' };
 
-  if (!createForm || !createErrors || !createResult || !healthResult || !linksTableBody || !fillSampleButton || !healthButton || !refreshLinksButton || !workflowButton || !workflowResult || !createdUrlModal || !createdUrlDetails || !modalOpenShort || !modalOpenTarget || !modalClose) {
+function byId(id) {
+  return document.getElementById(id);
+}
+
+function setResult(element, value) {
+  if (!element) {
     return;
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
+  element.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+function showError(errorElement, message) {
+  if (!errorElement) {
+    return;
   }
 
-  function closeModal() {
-    createdUrlModal.hidden = true;
+  errorElement.hidden = false;
+  errorElement.textContent = message;
+}
+
+function hideError(errorElement) {
+  if (!errorElement) {
+    return;
   }
 
-  function openCreatedUrlModal(record) {
-    modalState.shortUrl = record.shortUrl || '';
-    modalState.targetUrl = record.targetUrl || '';
-    const createdAt = record.createdAt ? new Date(record.createdAt).toLocaleString() : 'n/a';
+  errorElement.hidden = true;
+  errorElement.textContent = '';
+}
 
-    createdUrlDetails.innerHTML = [
-      '<strong>Code</strong><span>' + escapeHtml(record.code || 'n/a') + '</span>',
-      '<strong>Short URL</strong><span><a href="' + escapeHtml(modalState.shortUrl) + '" target="_blank" rel="noopener">' + escapeHtml(modalState.shortUrl || 'n/a') + '</a></span>',
-      '<strong>Target URL</strong><span><a href="' + escapeHtml(modalState.targetUrl) + '" target="_blank" rel="noopener">' + escapeHtml(modalState.targetUrl || 'n/a') + '</a></span>',
-      '<strong>Created</strong><span>' + escapeHtml(createdAt) + '</span>',
-      '<strong>Status</strong><span>Saved and ready to use.</span>'
-    ].join('');
+function parseTags(rawTags) {
+  return rawTags
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
 
-    createdUrlModal.hidden = false;
+function openCreatedModal(modalState, record) {
+  if (!modalState.modalElement || !modalState.detailsElement) {
+    return;
   }
 
-  function renderLinksTable(records) {
-    if (!records.length) {
-      linksTableBody.innerHTML = '<tr><td colspan="5" class="muted">No URLs created yet.</td></tr>';
+  modalState.record = record;
+  const expiresAt = record.expiresAt ?? 'No expiration';
+  const tags = record.tags.length > 0 ? `<ul>${record.tags.map((tag) => `<li>${tag}</li>`).join('')}</ul>` : 'No tags';
+
+  modalState.detailsElement.innerHTML = `
+    <strong>Code</strong><span>${record.code}</span>
+    <strong>Short URL</strong><span><a href="${record.shortUrl}" target="_blank" rel="noopener noreferrer">${record.shortUrl}</a></span>
+    <strong>Target URL</strong><span><a href="${record.originalUrl}" target="_blank" rel="noopener noreferrer">${record.originalUrl}</a></span>
+    <strong>Created At</strong><span>${new Date(record.createdAt).toLocaleString()}</span>
+    <strong>Expires</strong><span>${expiresAt}</span>
+    <strong>Tags</strong><span>${tags}</span>
+  `;
+
+  modalState.modalElement.hidden = false;
+}
+
+function closeCreatedModal(modalState) {
+  if (!modalState.modalElement) {
+    return;
+  }
+
+  modalState.modalElement.hidden = true;
+  modalState.record = null;
+}
+
+async function createShortUrl(payload) {
+  const response = await fetch('/api/urls', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload)
+  });
+
+  const body = await response.json();
+  if (!response.ok) {
+    throw new Error(body.message ?? 'Failed to create URL');
+  }
+
+  return body;
+}
+
+async function refreshLinksTable(tableBody) {
+  if (!tableBody) {
+    return;
+  }
+
+  tableBody.innerHTML = '<tr><td colspan="5" class="muted">Loading links...</td></tr>';
+
+  try {
+    const response = await fetch('/api/urls');
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.message ?? 'Unable to load links');
+    }
+
+    if (!Array.isArray(payload.records) || payload.records.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="muted">No short URLs created yet.</td></tr>';
       return;
     }
 
-    linksTableBody.innerHTML = records.map((record) => {
-      const createdAt = record.createdAt ? new Date(record.createdAt).toLocaleString() : 'n/a';
-      return '<tr>' +
-        '<td>' + escapeHtml(record.code || '') + '</td>' +
-        '<td><a href="' + escapeHtml(record.shortUrl || '#') + '" target="_blank" rel="noopener">' + escapeHtml(record.shortUrl || '') + '</a></td>' +
-        '<td><a href="' + escapeHtml(record.targetUrl || '#') + '" target="_blank" rel="noopener">' + escapeHtml(record.targetUrl || '') + '</a></td>' +
-        '<td>' + escapeHtml(record.clickCount ?? 0) + '</td>' +
-        '<td>' + escapeHtml(createdAt) + '</td>' +
-      '</tr>';
-    }).join('');
+    tableBody.innerHTML = payload.records
+      .map((record) => {
+        const createdAt = new Date(record.createdAt).toLocaleString();
+        return `
+          <tr>
+            <td><code>${record.code}</code></td>
+            <td><a href="${record.shortUrl}" target="_blank" rel="noopener noreferrer">${record.shortUrl}</a></td>
+            <td><a href="${record.originalUrl}" target="_blank" rel="noopener noreferrer">${record.originalUrl}</a></td>
+            <td>${record.clickCount}</td>
+            <td>${createdAt}</td>
+          </tr>
+        `;
+      })
+      .join('');
+  } catch (error) {
+    tableBody.innerHTML = `<tr><td colspan="5" class="muted">${error.message}</td></tr>`;
+  }
+}
+
+async function runHealthCheck(healthResult) {
+  if (!healthResult) {
+    return;
   }
 
-  async function readResponseBody(response) {
-    const contentType = response.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      return response.json();
-    }
-    return response.text();
-  }
+  setResult(healthResult, 'Checking health...');
+  try {
+    const response = await fetch('/health');
+    const payload = await response.json();
 
-  function setErrorBlock(element, message) {
-    element.hidden = false;
-    element.textContent = message;
-  }
-
-  async function refreshHealth() {
-    try {
-      const response = await fetch('/health');
-      const body = await readResponseBody(response);
-      healthResult.textContent = JSON.stringify({ endpoint: '/health', status: response.status, body }, null, 2);
-    } catch (error) {
-      healthResult.textContent = 'Health check failed: ' + error.message;
-    }
-  }
-
-  async function refreshLinks() {
-    try {
-      const response = await fetch('/api/urls');
-      const body = await readResponseBody(response);
-      const records = Array.isArray(body?.data) ? body.data : [];
-      renderLinksTable(records);
-    } catch (error) {
-      linksTableBody.innerHTML = '<tr><td colspan="5" class="muted">Could not refresh links: ' + escapeHtml(error.message) + '</td></tr>';
-    }
-  }
-
-  async function runWorkflow() {
-    const scenario = document.getElementById('workflow-select').value;
-    const payloadInput = document.getElementById('workflow-payload').value.trim();
-
-    workflowResult.textContent = 'Sending workflow request...';
-
-    let body = {};
-    if (payloadInput) {
-      try {
-        body = JSON.parse(payloadInput);
-      } catch (error) {
-        workflowResult.textContent = 'Workflow payload must be valid JSON.\n' + error.message;
-        return;
-      }
+    if (!response.ok) {
+      throw new Error(payload.message ?? 'Health check failed');
     }
 
-    try {
-      const response = await fetch('/api/workflows/' + scenario, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await readResponseBody(response);
-      workflowResult.textContent = JSON.stringify({ status: response.status, data }, null, 2);
-    } catch (error) {
-      workflowResult.textContent = 'Workflow request failed: ' + error.message;
-    }
+    setResult(healthResult, payload);
+  } catch (error) {
+    setResult(healthResult, `Health check failed: ${error.message}`);
+  }
+}
+
+function initCreateFlow() {
+  const createForm = byId('create-link-form');
+  if (!createForm) {
+    return;
   }
 
-  fillSampleButton.addEventListener('click', () => {
-    document.getElementById('target-url').value = 'https://example.com/docs';
-    document.getElementById('custom-code').value = 'team-docs';
-    document.getElementById('expires-days').value = '30';
-    document.getElementById('tags').value = 'internal, docs';
-    document.getElementById('idempotency-key').value = 'request-001';
-  });
+  const targetUrlInput = byId('target-url');
+  const customCodeInput = byId('custom-code');
+  const expiresDaysInput = byId('expires-days');
+  const tagsInput = byId('tags');
+  const idempotencyKeyInput = byId('idempotency-key');
+  const createErrors = byId('create-errors');
+  const createResult = byId('create-result');
+  const fillSampleButton = byId('fill-sample');
+
+  const modalState = {
+    modalElement: byId('created-url-modal'),
+    detailsElement: byId('created-url-details'),
+    openShortButton: byId('modal-open-short'),
+    openTargetButton: byId('modal-open-target'),
+    closeButton: byId('modal-close'),
+    record: null
+  };
 
   createForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    createErrors.hidden = true;
-    createErrors.textContent = '';
+    hideError(createErrors);
 
-    const targetUrl = document.getElementById('target-url').value.trim();
-    const customCode = document.getElementById('custom-code').value.trim();
-    const expiresValue = document.getElementById('expires-days').value;
-    const tagsValue = document.getElementById('tags').value.trim();
-    const idempotencyKey = document.getElementById('idempotency-key').value.trim();
-
-    const issues = [];
-
+    const targetUrl = targetUrlInput.value.trim();
     if (!targetUrl) {
-      issues.push('Target URL is required.');
-    } else if (!/^https?:\/\//i.test(targetUrl)) {
-      issues.push('Only http(s) URLs are supported.');
-    }
-
-    if (customCode && !/^[a-zA-Z0-9_-]{4,24}$/.test(customCode)) {
-      issues.push('Custom code must be 4-24 letters, numbers, underscores, or dashes.');
-    }
-
-    if (issues.length > 0) {
-      createErrors.hidden = false;
-      createErrors.textContent = issues.join('\n');
+      showError(createErrors, 'Target URL is required.');
       return;
     }
 
     const payload = {
       url: targetUrl,
-      customCode: customCode || undefined,
-      expiresInDays: expiresValue ? Number(expiresValue) : undefined,
-      tags: tagsValue ? tagsValue.split(',').map((tag) => tag.trim()).filter(Boolean) : [],
-      idempotencyKey: idempotencyKey || undefined
+      customCode: customCodeInput.value.trim() || undefined,
+      expiresInDays: expiresDaysInput.value ? Number(expiresDaysInput.value) : undefined,
+      tags: parseTags(tagsInput.value),
+      idempotencyKey: idempotencyKeyInput.value.trim() || undefined
     };
 
+    setResult(createResult, 'Submitting request...');
+
     try {
-      const response = await fetch('/api/urls', {
+      const result = await createShortUrl(payload);
+      setResult(createResult, result);
+      openCreatedModal(modalState, result.record);
+    } catch (error) {
+      showError(createErrors, error.message);
+      setResult(createResult, error.message);
+    }
+  });
+
+  fillSampleButton?.addEventListener('click', () => {
+    targetUrlInput.value = 'https://example.com/agentic-flow';
+    customCodeInput.value = 'agentic-flow';
+    expiresDaysInput.value = '30';
+    tagsInput.value = 'assignment, review';
+    idempotencyKeyInput.value = `sample-${Date.now()}`;
+    hideError(createErrors);
+  });
+
+  modalState.closeButton?.addEventListener('click', () => closeCreatedModal(modalState));
+
+  modalState.modalElement?.addEventListener('click', (event) => {
+    if (event.target === modalState.modalElement) {
+      closeCreatedModal(modalState);
+    }
+  });
+
+  modalState.openShortButton?.addEventListener('click', () => {
+    if (modalState.record?.shortUrl) {
+      window.open(modalState.record.shortUrl, '_blank', 'noopener,noreferrer');
+    }
+  });
+
+  modalState.openTargetButton?.addEventListener('click', () => {
+    if (modalState.record?.originalUrl) {
+      window.open(modalState.record.originalUrl, '_blank', 'noopener,noreferrer');
+    }
+  });
+}
+
+function initLinksFlow() {
+  const linksTableBody = byId('links-table-body');
+  if (!linksTableBody) {
+    return;
+  }
+
+  const refreshLinksButton = byId('refresh-links-button');
+  const healthCheckButton = byId('health-check-button');
+  const healthResult = byId('health-result');
+
+  refreshLinksButton?.addEventListener('click', () => {
+    refreshLinksTable(linksTableBody);
+  });
+
+  healthCheckButton?.addEventListener('click', () => {
+    runHealthCheck(healthResult);
+  });
+
+  refreshLinksTable(linksTableBody);
+  runHealthCheck(healthResult);
+}
+
+function initWorkflowFlow() {
+  const workflowSelect = byId('workflow-select');
+  const workflowPayload = byId('workflow-payload');
+  const runWorkflowButton = byId('run-workflow-button');
+  const workflowResult = byId('workflow-result');
+
+  if (!workflowSelect || !workflowPayload || !runWorkflowButton || !workflowResult) {
+    return;
+  }
+
+  runWorkflowButton.addEventListener('click', async () => {
+    setResult(workflowResult, 'Running workflow...');
+
+    let payload;
+    try {
+      payload = workflowPayload.value.trim() ? JSON.parse(workflowPayload.value) : {};
+    } catch {
+      setResult(workflowResult, 'Invalid JSON payload.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/workflows/${workflowSelect.value}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders,
         body: JSON.stringify(payload)
       });
-      const data = await readResponseBody(response);
+      const body = await response.json();
+
       if (!response.ok) {
-        setErrorBlock(createErrors, JSON.stringify(data, null, 2));
-        createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
-        return;
+        throw new Error(body.message ?? 'Workflow run failed');
       }
-      createErrors.hidden = true;
-      createErrors.textContent = '';
-      createResult.textContent = JSON.stringify({ status: response.status, payload, data }, null, 2);
-      if (data && data.record) {
-        openCreatedUrlModal(data.record);
-      }
-      await refreshLinks();
+
+      setResult(workflowResult, body);
     } catch (error) {
-      createResult.textContent = 'Request failed: ' + error.message;
+      setResult(workflowResult, error.message);
     }
   });
-
-  modalOpenShort.addEventListener('click', () => {
-    if (modalState.shortUrl) {
-      window.open(modalState.shortUrl, '_blank', 'noopener');
-    }
-  });
-
-  modalOpenTarget.addEventListener('click', () => {
-    if (modalState.targetUrl) {
-      window.open(modalState.targetUrl, '_blank', 'noopener');
-    }
-  });
-
-  modalClose.addEventListener('click', () => {
-    closeModal();
-  });
-
-  createdUrlModal.addEventListener('click', (event) => {
-    if (event.target === createdUrlModal) {
-      closeModal();
-    }
-  });
-
-  healthButton.addEventListener('click', () => {
-    refreshHealth();
-  });
-
-  refreshLinksButton.addEventListener('click', () => {
-    refreshLinks();
-  });
-
-  workflowButton.addEventListener('click', () => {
-    runWorkflow();
-  });
-
-  refreshHealth();
-  refreshLinks();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeUi);
-} else {
-  initializeUi();
-}
+document.addEventListener('DOMContentLoaded', () => {
+  initCreateFlow();
+  initLinksFlow();
+  initWorkflowFlow();
+});

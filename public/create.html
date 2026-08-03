@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create URL Flow</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <main>
+      <nav class="top-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/create" class="active">Create URL</a>
+        <a href="/links">Review URLs</a>
+        <a href="/workflows">Run Workflows</a>
+      </nav>
+
+      <section class="hero">
+        <p class="eyebrow">Flow 1</p>
+        <h1>Create Short URL</h1>
+        <p>Submit a URL request and confirm output in a review modal.</p>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Create a short link</h2>
+          <form id="create-link-form" novalidate>
+            <label class="field">
+              <span>Target URL</span>
+              <input id="target-url" name="url" type="url" placeholder="https://example.com/docs" required />
+            </label>
+            <label class="field">
+              <span>Custom short code</span>
+              <input id="custom-code" name="customCode" placeholder="team-docs" maxlength="24" />
+            </label>
+            <label class="field">
+              <span>Expiration</span>
+              <select id="expires-days" name="expiresInDays">
+                <option value="">No expiration</option>
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Tags</span>
+              <input id="tags" name="tags" placeholder="internal, docs" />
+            </label>
+            <label class="field">
+              <span>Idempotency key</span>
+              <input id="idempotency-key" name="idempotencyKey" placeholder="request-001" />
+            </label>
+            <div class="actions">
+              <button type="submit">Create link</button>
+              <button type="button" class="secondary" id="fill-sample">Use sample values</button>
+            </div>
+          </form>
+          <div id="create-errors" class="status error" hidden></div>
+          <pre id="create-result" class="result">No request yet.</pre>
+        </article>
+      </section>
+
+      <div id="created-url-modal" class="modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="created-url-title">
+          <h3 id="created-url-title">URL created successfully</h3>
+          <div id="created-url-details" class="kv"></div>
+          <div class="actions top-gap">
+            <button type="button" id="modal-open-short">Open short URL</button>
+            <button type="button" class="secondary" id="modal-open-target">Open target URL</button>
+            <button type="button" class="secondary" id="modal-close">Close</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="/assets/app-ui.js" defer></script>
+  </body>
+</html>

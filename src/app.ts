@@ -23,6 +23,9 @@ function getRequester(request: Request): string {
 
 const publicDirPath = path.resolve(process.cwd(), 'public');
 const homePagePath = path.join(publicDirPath, 'index.html');
+const createPagePath = path.join(publicDirPath, 'create.html');
+const linksPagePath = path.join(publicDirPath, 'links.html');
+const workflowsPagePath = path.join(publicDirPath, 'workflows.html');
 
 type RateLimitBucket = {
   windowStartedAt: number;
@@ -97,6 +100,18 @@ export function createApp(urlShortenerService: UrlShortenerService) {
 
   app.get('/', (_request, response) => {
     response.sendFile(homePagePath);
+  });
+
+  app.get('/create', (_request, response) => {
+    response.sendFile(createPagePath);
+  });
+
+  app.get('/links', (_request, response) => {
+    response.sendFile(linksPagePath);
+  });
+
+  app.get('/workflows', (_request, response) => {
+    response.sendFile(workflowsPagePath);
   });
 
   app.get('/favicon.ico', (_request, response) => {

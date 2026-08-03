@@ -54,6 +54,19 @@ describe('UrlShortenerService', () => {
     expect(second.record.targetUrl).toBe('https://example.com/a');
   });
 
+  it('uses an injected code generator for short-code allocation', async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'schwab-url-service-'));
+    const repository = new FileUrlRepository(path.join(tempDir, 'urls.json'));
+    const service = new UrlShortenerService(repository, 'http://localhost:3000', () => new Date(), () => 'custom-code');
+
+    const result = await service.createShortUrl({
+      url: 'https://example.com/generated',
+      tags: []
+    });
+
+    expect(result.record.code).toBe('custom-code');
+  });
+
   it('rejects expired short codes', async () => {
     const baseTime = new Date('2026-08-01T00:00:00.000Z');
     let currentTime = baseTime;

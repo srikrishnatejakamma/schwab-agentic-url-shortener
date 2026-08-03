@@ -13,8 +13,11 @@ function isMissingFileError(error: unknown): boolean {
 
 export class FileUrlRepository implements UrlRepository {
   private readonly records = new Map<string, UrlRecord>();
+  private readonly idempotencyIndex = new Map<string, string>();
   private loaded = false;
   private readonly tempFilePath: string;
+  private flushPromise: Promise<void> = Promise.resolve();
+  private isFlushing = false;
 
   public constructor(private readonly filePath: string) {
     this.tempFilePath = `${filePath}.${process.pid}.tmp`;
@@ -28,19 +31,22 @@ export class FileUrlRepository implements UrlRepository {
   public async getByIdempotencyKey(idempotencyKey: string): Promise<UrlRecord | undefined> {
     await this.load();
 
-    for (const record of this.records.values()) {
-      if (record.idempotencyKey === idempotencyKey) {
-        return record;
-      }
-    }
-
-    return undefined;
+    const code = this.idempotencyIndex.get(idempotencyKey);
+    return code ? this.records.get(code) : undefined;
   }
 
   public async save(record: UrlRecord): Promise<void> {
     await this.load();
-    this.records.set(record.code, record);
-    await this.flush();
+    this.upsertRecord(record);
+
+    if (!this.isFlushing) {
+      this.isFlushing = true;
+      this.flushPromise = this.flush().finally(() => {
+        this.isFlushing = false;
+      });
+    }
+
+    await this.flushPromise;
   }
 
   public async list(): Promise<UrlRecord[]> {
@@ -59,7 +65,7 @@ export class FileUrlRepository implements UrlRepository {
       const content = await fs.readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as RepositoryFileShape;
       for (const record of parsed.records) {
-        this.records.set(record.code, record);
+        this.upsertRecord(record);
       }
     } catch (error) {
       if (!isMissingFileError(error)) {
@@ -68,6 +74,18 @@ export class FileUrlRepository implements UrlRepository {
     }
 
     this.loaded = true;
+  }
+
+  private upsertRecord(record: UrlRecord): void {
+    const previous = this.records.get(record.code);
+    if (previous?.idempotencyKey) {
+      this.idempotencyIndex.delete(previous.idempotencyKey);
+    }
+
+    this.records.set(record.code, record);
+    if (record.idempotencyKey) {
+      this.idempotencyIndex.set(record.idempotencyKey, record.code);
+    }
   }
 
   private async flush(): Promise<void> {

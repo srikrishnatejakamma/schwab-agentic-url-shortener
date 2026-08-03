@@ -1,6 +1,8 @@
 import type { AnalyticsSnapshot, CreateUrlRequest, CreateUrlResult, UrlAccessEvent, UrlRecord, UrlRepository } from './models.js';
 import { generateBase62Code } from '../utils/base62.js';
 
+export type CodeGenerator = (length: number) => string;
+
 export class ServiceError extends Error {
   public constructor(
     message: string,
@@ -22,7 +24,8 @@ export class UrlShortenerService {
   public constructor(
     private readonly repository: UrlRepository,
     private readonly baseUrl: string,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly codeGenerator: CodeGenerator = generateBase62Code
   ) {
     this.normalizedBaseUrl = this.baseUrl.replace(/\/+$/, '');
   }
@@ -146,7 +149,7 @@ export class UrlShortenerService {
 
   private async generateUniqueCode(): Promise<string> {
     for (let attempt = 0; attempt < 8; attempt += 1) {
-      const code = generateBase62Code(7);
+      const code = this.codeGenerator(7);
       const existing = await this.repository.getByCode(code);
       if (!existing) {
         return code;

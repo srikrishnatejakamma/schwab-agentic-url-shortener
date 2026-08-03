@@ -494,6 +494,14 @@ function getClientKey(request: Request): string {
   return getClientAddress(request);
 }
 
+function pruneRateLimitBuckets(now: number): void {
+  for (const [key, bucket] of rateLimitBuckets.entries()) {
+    if (now - bucket.windowStartedAt >= rateLimitWindowMs) {
+      rateLimitBuckets.delete(key);
+    }
+  }
+}
+
 function applySecurityHeaders(response: Response): void {
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('X-Frame-Options', 'DENY');
@@ -503,6 +511,8 @@ function applySecurityHeaders(response: Response): void {
 
 function enforceRateLimit(request: Request, response: Response, bucketName: string): boolean {
   const now = Date.now();
+  pruneRateLimitBuckets(now);
+
   const clientKey = `${bucketName}:${getClientKey(request)}`;
   const bucket = rateLimitBuckets.get(clientKey);
 

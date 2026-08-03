@@ -26,6 +26,8 @@ The API starts on `http://localhost:3000` by default.
 
 ## API Surface
 
+The API contract is documented in [docs/openapi.yaml](docs/openapi.yaml).
+
 ```text
 GET    /health
 GET    /api/urls
@@ -60,6 +62,8 @@ npm run scenario:ambiguous
 ```
 
 ## Assignment Coverage
+
+A complete engineering summary is available in [docs/engineering-summary.md](docs/engineering-summary.md).
 
 - Requirement understanding: each workflow starts with normalization and assumption capture.
 - Task decomposition: workflows encode dependencies explicitly in a DAG.

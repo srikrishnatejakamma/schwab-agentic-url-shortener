@@ -43,3 +43,17 @@ Each run produces:
 - Release readiness is gated on validation evidence and security-review evidence.
 - Expired links return `410 Gone` instead of silently redirecting.
 - Idempotency keys prevent accidental duplicate short-link creation.
+
+## Deliverable Alignment
+
+This implementation is aligned with the assignment brief by providing:
+- a runnable end-to-end prototype,
+- architecture overview and scenario documentation,
+- three workflow scenarios for greenfield, brownfield, and ambiguous requirements,
+- test coverage and validation artifacts,
+- an engineering summary explaining assumptions, risks, and trade-offs.
+
+- Ambiguous requirements block downstream execution until clarified.
+- Release readiness is gated on validation evidence and security-review evidence.
+- Expired links return `410 Gone` instead of silently redirecting.
+- Idempotency keys prevent accidental duplicate short-link creation.
